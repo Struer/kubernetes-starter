@@ -1,5 +1,7 @@
 #!/bin/bash
 
+## 自动生成适用于当前的环境的配置文件
+
 declare -A kvs=()
 
 function replace_files() {
