@@ -133,8 +133,7 @@ kubernetes-bins/calico
 kubernetes-bins/calicoctl
 kubernetes-bins/kube-scheduler
 kubernetes-bins/etcd
-[root@mini3 ~]# rm kubernetes-bins
-kubernetes-bins/        kubernetes-bins.tar.gz  
+ 
 [root@mini3 ~]# rm kubernetes-bins.tar.gz 
 [root@mini3 ~]# mv kubernetes-bins/ bin
 [root@mini3 ~]# ll
@@ -156,9 +155,7 @@ drwxrwxr-x. 8 1000 linux 226 1月  22 09:16 kubernetes-starter
 -rwxr-xr-x. 1 root linux  61566971 1月   7 2018 kube-scheduler
 -rwxr-xr-x. 1 root linux   3909976 1月   7 2018 loopback
 -rw-r--r--. 1 root linux        78 1月   7 2018 VERSION.md
-[root@mini3 ~]# kube
-kube-apiserver           kubectl                  kube-proxy               
-kube-controller-manager  kubelet                  kube-scheduler           
+      
 [root@mini3 ~]# kubectl 
 kubectl controls the Kubernetes cluster manager. 
 ```
