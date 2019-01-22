@@ -8,6 +8,12 @@
 | ubuntu16.04 | 192.168.1.102 | master |   1    | 2G | server02 |
 | ubuntu16.04 | 192.168.1.103 | worker |   1    | 2G | server03 |
 
+| 系统类型 | IP地址 | 节点角色 | CPU | Memory | Hostname |
+| :------: | :--------: | :-------: | :-----: | :---------: | :-----: |
+| centos7 | 192.168.252.31 | worker |   1    | 2G | mini1 |
+| centos7 | 192.168.252.32 | worker |   1    | 2G | mini2 |
+| centos7 | 192.168.252.33 | master |   1    | 2G | mini3 |
+
 > 使用centos的同学也可以参考此文档，需要注意替换系统命令即可
 
 ## 2. 安装docker（所有节点）

@@ -344,6 +344,15 @@ $ systemctl enable kubelet.service
 $ service kubelet start
 $ journalctl -f -u kubelet
 ```
+**两个工作节点配置完成后，可以在主节点上（配置kubectl命令的节点192.168.252.33）查看**
+```bash
+[root@mini3 kubernetes-starter]# kubectl get nodes
+NAME             STATUS    ROLES     AGE       VERSION
+192.168.252.31   Ready     <none>    1h        v1.9.0
+192.168.252.32   Ready     <none>    1h        v1.9.0
+```
+
+
 #### 7.3 重点配置说明
 **kubelet.service**
 > [Unit]  
@@ -402,6 +411,122 @@ calico作为kubernets的CNI插件的配置
 到这里最基础的kubernetes集群就可以工作了。下面我们就来试试看怎么去操作，控制它。
 我们从最简单的命令开始，尝试一下kubernetes官方的入门教学：playground的内容。了解如何创建pod，deployments，以及查看他们的信息，深入理解他们的关系。
 具体内容请看慕课网的视频吧：  [《Docker+k8s微服务容器化实践》][1]
+
+```bash
+kubectl get pods
+kubectl get nodes
+kubectl version
+kubectl get --help
+# 创建一个deployment
+# 做的事情：找到适合我们的节点
+[root@mini3 kubernetes-starter]# kubectl run kubernetes-bootcamp --image=jocatalin/kubernetes-bootcamp:v1 --port=8080
+deployment "kubernetes-bootcamp" created
+[root@mini3 kubernetes-starter]# 
+# 查看创建的deployment列表
+[root@mini3 kubernetes-starter]# kubectl get deployments
+      表示期望的有几个pod    当前有几个pod   最新的    可用的pod
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   1         1         1            1           1m
+# 删除创建的deployment
+[root@mini3 kubernetes-starter]# kubectl delete deployments kubernetes-bootcamp
+# 此时查看pod：
+[root@mini3 kubernetes-starter]# kubectl get pods
+NAME                                   READY     STATUS    RESTARTS   AGE
+kubernetes-bootcamp-6b7849c495-kdxpr   1/1       Running   0          3m
+# 加 -o wide 查看更多信息
+[root@mini3 kubernetes-starter]# kubectl get pods -o wide
+NAME                                   READY     STATUS    RESTARTS   AGE       IP             NODE
+kubernetes-bootcamp-6b7849c495-kdxpr   1/1       Running   0          4m        172.20.51.64   192.168.252.31
+# describe查看deployment的描述信息
+[root@mini3 kubernetes-starter]# kubectl describe deploy kubernetes-bootcamp 
+Name:                   kubernetes-bootcamp
+Namespace:              default
+# describe查看pod的描述信息
+[root@mini3 kubernetes-starter]# kubectl describe deploy kubernetes-bootcamp 
+Name:                   kubernetes-bootcamp
+Namespace:              default
+CreationTimestamp:      Wed, 23 Jan 2019 01:31:16 +0800
+Labels:                 run=kubernetes-bootcamp
+
+```
+
+**访问创建的容器kubectl proxy**
+proxy
+```bash
+[root@mini3 kubernetes-starter]# kubectl proxy
+Starting to serve on 127.0.0.1:8001
+#另起一个窗口
+[root@mini3 ~]# curl http://localhost:8001/api/v1/proxy/namespaces/default/pods/kubernetes-bootcamp-6b7849c495-kdxpr/
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-6b7849c495-kdxpr | v=1
+[root@mini3 ~]# 
+
+```
+**扩缩容kubectl scale**
+```bash
+[root@mini3 kubernetes-starter]# kubectl get deploy
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   1         1         1            1           21m
+
+[root@mini3 kubernetes-starter]# kubectl scale deploy kubernetes-bootcamp --replicas=4
+deployment "kubernetes-bootcamp" scaled
+
+[root@mini3 kubernetes-starter]# kubectl get deploy
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   4         4         4            2           21m
+
+[root@mini3 kubernetes-starter]# kubectl get deploy     //一段时间之后容器就全部启动了，之前是在下载镜像
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   4         4         4            4           25m
+
+[root@mini3 kubernetes-starter]# kubectl get pods -o wide     
+NAME                                   READY     STATUS    RESTARTS   AGE       IP             NODE
+kubernetes-bootcamp-6b7849c495-62b88   1/1       Running   0          2m        172.20.55.64   192.168.252.32
+kubernetes-bootcamp-6b7849c495-8blgn   1/1       Running   0          2m        172.20.51.65   192.168.252.31
+kubernetes-bootcamp-6b7849c495-gjdcm   1/1       Running   0          2m        172.20.55.65   192.168.252.32
+kubernetes-bootcamp-6b7849c495-kdxpr   1/1       Running   0          24m       172.20.51.64   192.168.252.31
+[root@mini3 kubernetes-starter]# kubectl get deploy
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   4         4         4            4           25m
+
+[root@mini3 kubernetes-starter]# kubectl scale deploy kubernetes-bootcamp --replicas=2   //缩容
+deployment "kubernetes-bootcamp" scaled
+[root@mini3 kubernetes-starter]# kubectl get pods -o wide
+NAME                                   READY     STATUS        RESTARTS   AGE       IP             NODE
+kubernetes-bootcamp-6b7849c495-62b88   1/1       Terminating   0          6m        172.20.55.64   192.168.252.32
+kubernetes-bootcamp-6b7849c495-8blgn   1/1       Running       0          6m        172.20.51.65   192.168.252.31
+kubernetes-bootcamp-6b7849c495-gjdcm   1/1       Terminating   0          6m        172.20.55.65   192.168.252.32
+kubernetes-bootcamp-6b7849c495-kdxpr   1/1       Running       0          28m       172.20.51.64   192.168.252.31
+
+```
+
+**更新镜像**
+```bash
+[root@mini3 kubernetes-starter]# kubectl describe deploy
+Name:                   kubernetes-bootcamp
+    Image:        jocatalin/kubernetes-bootcamp:v1
+# 改deploy的镜像，deploy的名字与容器的名字是一样的(如果版本号错误，kubectl rollout status查看会一直在pending状态)
+[root@mini3 kubernetes-starter]# kubectl set image deploy kubernetes-bootcamp kubernetes-bootcamp=jocatalin/kubernetes-bootcamp:v2
+deployment "kubernetes-bootcamp" image updated
+# 查看更新的结果
+[root@mini3 kubernetes-starter]# kubectl rollout status deploy kubernetes-bootcamp
+deployment "kubernetes-bootcamp" successfully rolled out
+[root@mini3 kubernetes-starter]# 
+# 此时再查看deploy的kubernetes-bootcamp的镜像
+[root@mini3 kubernetes-starter]# kubectl describe deploy
+Name:                   kubernetes-bootcamp
+    Image:        jocatalin/kubernetes-bootcamp:v2
+# 回退至更新版本之前的状态（在更新版本命令输错版本号错误等情况下回退）
+# 回退之前的deploy kubernetes-bootcamp操作
+[root@mini3 kubernetes-starter]# kubectl rollout undo deploy kubernetes-bootcamp
+deployment "kubernetes-bootcamp" 
+[root@mini3 kubernetes-starter]# kubectl rollout status deploy kubernetes-bootcamp
+deployment "kubernetes-bootcamp" successfully rolled out
+[root@mini3 kubernetes-starter]# kubectl describe deploy  // 此时版本已经回退至v1
+Name:                   kubernetes-bootcamp
+    Image:        jocatalin/kubernetes-bootcamp:v1
+
+```
+
 
 ## 9. 为集群增加service功能 - kube-proxy（工作节点）
 #### 9.1 简介
