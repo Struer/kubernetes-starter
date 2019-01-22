@@ -18,6 +18,33 @@ $ mkdir -p /var/lib/etcd
 $ service etcd start
 # 查看服务日志，看是否有错误信息，确保服务正常
 $ journalctl -f -u etcd.service
+# 查看监听端口
+$ netstat -ntlp
+# 查看etcd.service
+$ cat /lib/systemd/system/etcd.service 
+[Unit]
+Description=Etcd Server
+After=network.target
+After=network-online.target
+Wants=network-online.target
+Documentation=https://github.com/coreos
+
+[Service]
+Type=notify
+WorkingDirectory=/var/lib/etcd/     定义工作目录，会将配置文件等存在这个位置
+ExecStart=/home/linux/bin/etcd \    命令的位置
+  --name=192.168.252.33 \           指定name，只要是唯一用于区分就行，这里使用ip
+  --listen-client-urls=http://192.168.252.33:2379,http://127.0.0.1:2379 \    监听：如果之监听127.0.0.1，其他服务器是无法联通到这个IP的，这个端口只有在本机才能访问
+  --advertise-client-urls=http://192.168.252.33:2379 \      建议其他的客户端访问本机etcl的url地址，可以用于代理或node之间的通讯等
+  --data-dir=/var/lib/etcd      存储数据的地址
+Restart=on-failure 
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+
+
 ```
 
 ## 2. 部署APIServer（主节点）
@@ -35,6 +62,42 @@ $ cp target/master-node/kube-apiserver.service /lib/systemd/system/
 $ systemctl enable kube-apiserver.service
 $ service kube-apiserver start
 $ journalctl -f -u kube-apiserver
+# 查看配置文件：
+$ vi /lib/systemd/system/kube-apiserver.service 
+  
+  [Unit]
+  Description=Kubernetes API Server
+  Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+  After=network.target
+  [Service]
+  ExecStart=/home/linux/bin/kube-apiserver \    可执行文件的位置
+    准入控制，一般与认证授权一起
+    --admission-control=NamespaceLifecycle,LimitRanger,DefaultStorageClass,ResourceQuota,NodeRestriction \
+    不安全的绑定地址，绑定至0.0.0.0表示可以用任意方式访问到端口，域名，ip等等
+    --insecure-bind-address=0.0.0.0 \
+    不使用https
+    --kubelet-https=false \
+    指定service集群的ip范围
+    --service-cluster-ip-range=10.68.0.0/16 \
+    --service-node-port-range=20000-40000 \
+    --etcd-servers=http://192.168.252.33:2379 \
+    --enable-swagger-ui=true \
+    --allow-privileged=true \
+    --audit-log-maxage=30 \
+    --audit-log-maxbackup=3 \
+    --audit-log-maxsize=100 \
+    --audit-log-path=/var/lib/audit.log \
+    --event-ttl=1h \
+    日志级别，越大打印日志越多
+    --v=2
+  Restart=on-failure
+  RestartSec=5
+  Type=notify
+  LimitNOFILE=65536
+  [Install]
+  WantedBy=multi-user.target
+
+
 ```
 
 #### 2.3 重点配置说明
@@ -127,6 +190,43 @@ $ systemctl enable kube-calico.service
 $ service kube-calico start
 $ journalctl -f -u kube-calico
 ```
+#### 5.2.1 重点配置说明
+> [root@mini3 kubernetes-starter]# cat /lib/systemd/system/kube-calico.service 
+> [Unit]
+> Description=calico node
+> After=docker.service
+> Requires=docker.service
+> 
+> [Service]
+> User=root
+> PermissionsStartOnly=true
+>   \#指定docker run的方式
+> ExecStart=/usr/bin/docker run --net=host --privileged --name=calico-node \
+>   \# 一下全是定义环境变量
+>   -e ETCD_ENDPOINTS=http://192.168.252.33:2379 \
+>   -e CALICO_LIBNETWORK_ENABLED=true \
+>   -e CALICO_NETWORKING_BACKEND=bird \
+>   -e CALICO_DISABLE_FILE_LOGGING=true \
+>   -e CALICO_IPV4POOL_CIDR=172.20.0.0/16 \
+>   -e CALICO_IPV4POOL_IPIP=off \
+>   -e FELIX_DEFAULTENDPOINTTOHOSTACTION=ACCEPT \
+>   -e FELIX_IPV6SUPPORT=false \
+>   -e FELIX_LOGSEVERITYSCREEN=info \
+>   -e FELIX_IPINIPMTU=1440 \
+>   -e FELIX_HEALTHENABLED=true \
+>   -e IP=192.168.252.33 \
+>   -v /var/run/calico:/var/run/calico \
+>   -v /lib/modules:/lib/modules \
+>   -v /run/docker/plugins:/run/docker/plugins \
+>   -v /var/run/docker.sock:/var/run/docker.sock \
+>   -v /var/log/calico:/var/log/calico \
+>   registry.cn-hangzhou.aliyuncs.com/imooc/calico-node:v2.6.2
+> ExecStop=/usr/bin/docker rm -f calico-node
+> Restart=always
+> RestartSec=10
+
+
+
 #### 5.3 calico可用性验证
 **查看容器运行情况**
 ```bash
@@ -196,16 +296,41 @@ kubectl config set-context kubernetes --cluster=kubernetes
 kubectl config use-context kubernetes
 ```
 > 通过上面的设置最终目的是生成了一个配置文件：~/.kube/config，当然你也可以手写或复制一个文件放在那，就不需要上面的命令了。
+> [root@mini3 kubernetes-starter]# vi ~/.kube/config 
+  
+>  apiVersion: v1
+>  clusters:
+>  - cluster:
+>      server: http://192.168.252.33:8080
+>    name: kubernetes
+>  contexts:
+>  - context:
+>      cluster: kubernetes
+>      user: ""
+>    name: kubernetes
+>  current-context: kubernetes
+>  kind: Config
+>  preferences: {}
+>  users: []
 
-## 7. 配置kubelet（工作节点）
+```
+完成之后可以通过kubectl命令验证是否成功
+[root@mini3 kubernetes-starter]# kubectl get pods
+No resources found.
+
+```
+## 7. 配置kubelet（工作节点），demo环境为192.168.252.31和32两个节点
 #### 7.1 简介
 每个工作节点上都运行一个kubelet服务进程，默认监听10250端口，接收并执行master发来的指令，管理Pod及Pod中的容器。每个kubelet进程会在API Server上注册节点自身信息，定期向master节点汇报节点的资源使用情况，并通过cAdvisor监控节点和容器的资源。
 #### 7.2 部署
 **通过系统服务方式部署，但步骤会多一些，具体如下：**
 ```bash
 #确保相关目录存在
+# kubelet的工作目录
 $ mkdir -p /var/lib/kubelet
+# kubernetes需要的配置文件
 $ mkdir -p /etc/kubernetes
+# 网络插件
 $ mkdir -p /etc/cni/net.d
 
 #复制kubelet服务配置文件
