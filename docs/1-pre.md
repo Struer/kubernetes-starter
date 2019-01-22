@@ -108,9 +108,60 @@ kubernetes的安装有几种方式，不管是kube-admin还是社区贡献的部
 
 从上面的三种方式中其实使用镜像是比较优雅的方案，容器的好处自然不用多说。但从初学者的角度来说容器的方案会显得有些复杂，不那么纯粹，会有很多容器的配置文件以及关于类似二进制文件提供的服务如何在容器中提供的问题，容易跑偏。
 所以我们这里使用二进制的方式来部署。二进制文件已经这里备好，大家可以打包下载，把下载好的文件放到每个节点上，放在哪个目录随你喜欢，**放好后最好设置一下环境变量$PATH**，方便后面可以直接使用命令。(科学上网的同学也可以自己去官网找找)  
-####[下载地址（kubernetes 1.9.0版本）][2] 
+####[下载地址（kubernetes 1.9.0版本）][2]   
+
+#### 步骤：
+上传kubernetes-bins.tar.gz  至/home/linux目录下  
 复制到服务器后解压：tar xvf kubernetes-bins.tar.gz  
-移动至bin目录下：mv kubernetes-bins/ bin
+删除压缩包：rm kubernetes-bins.tar.gz   
+移动至bin目录下：mv kubernetes-bins/ bin（此时可以直接使用bin下的命令）  
+测试：输入kubectl查看结果
+
+```
+[root@mini3 ~]# tar -xvf kubernetes-bins.tar.gz 
+kubernetes-bins/
+kubernetes-bins/etcdctl
+kubernetes-bins/kube-controller-manager
+kubernetes-bins/calico-ipam
+kubernetes-bins/VERSION.md
+kubernetes-bins/kubectl
+kubernetes-bins/kube-apiserver
+kubernetes-bins/kube-proxy
+kubernetes-bins/loopback
+kubernetes-bins/kubelet
+kubernetes-bins/calico
+kubernetes-bins/calicoctl
+kubernetes-bins/kube-scheduler
+kubernetes-bins/etcd
+[root@mini3 ~]# rm kubernetes-bins
+kubernetes-bins/        kubernetes-bins.tar.gz  
+[root@mini3 ~]# rm kubernetes-bins.tar.gz 
+[root@mini3 ~]# mv kubernetes-bins/ bin
+[root@mini3 ~]# ll
+总用量 0
+drwxr-xr-x. 2  501 ftp   240 1月   7 2018 bin
+drwxrwxr-x. 8 1000 linux 226 1月  22 09:16 kubernetes-starter
+[root@mini3 ~]# ll bin/
+总用量 793672
+-rwxr-xr-x. 1 root linux  29062464 1月   7 2018 calico
+-rwxr-xr-x. 1 root linux  32285568 1月   7 2018 calicoctl
+-rwxr-xr-x. 1 root linux  28424000 1月   7 2018 calico-ipam
+-rwxr-xr-x. 1 root linux  17809440 1月   7 2018 etcd
+-rwxr-xr-x. 1 root linux  15230304 1月   7 2018 etcdctl
+-rwxr-xr-x. 1 root linux 209244331 1月   7 2018 kube-apiserver
+-rwxr-xr-x. 1 root linux 136621177 1月   7 2018 kube-controller-manager
+-rwxr-xr-x. 1 root linux  67390552 1月   7 2018 kubectl
+-rwxr-xr-x. 1 root linux 147765224 1月   7 2018 kubelet
+-rwxr-xr-x. 1 root linux  63378954 1月   7 2018 kube-proxy
+-rwxr-xr-x. 1 root linux  61566971 1月   7 2018 kube-scheduler
+-rwxr-xr-x. 1 root linux   3909976 1月   7 2018 loopback
+-rw-r--r--. 1 root linux        78 1月   7 2018 VERSION.md
+[root@mini3 ~]# kube
+kube-apiserver           kubectl                  kube-proxy               
+kube-controller-manager  kubelet                  kube-scheduler           
+[root@mini3 ~]# kubectl 
+kubectl controls the Kubernetes cluster manager. 
+```
 
 ## 5. 准备配置文件（所有节点）
 上一步我们下载了kubernetes各个组件的二进制文件，这些可执行文件的运行也是需要添加很多参数的，包括有的还会依赖一些配置文件。现在我们就把运行它们需要的参数和配置文件都准备好。
