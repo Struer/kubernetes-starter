@@ -616,7 +616,7 @@ nginx-deployment-6c54bd5869-vj88j   1/1       Running   0          9m
 ```
 
 
-## 9. 为集群增加service功能 - kube-proxy（工作节点）
+## 9. 为集群增加service功能 - kube-proxy（工作节点 31 / 32 ）
 #### 9.1 简介
 每台工作节点上都应该运行一个kube-proxy服务，它监听API server中service和endpoint的变化情况，并通过iptables等来为服务配置负载均衡，是让我们的服务在集群外可以被访问到的重要方式。
 #### 9.2 部署
@@ -633,6 +633,126 @@ $ systemctl enable kube-proxy.service
 $ service kube-proxy start
 $ journalctl -f -u kube-proxy
 ```
+**安装完成后测试**
+```bash
+#在主节点上验证
+[root@mini3 services]# kubectl get services
+NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+kubernetes   ClusterIP   10.68.0.1    <none>        443/TCP   15h   //这个服务在api-server启动时默认创建的服务
+
+```
+**自己启动服务**
+```bash
+# --target-port=8080当前服务的实际提供服务的端口 --port=80是CLUSTER-IP访问服务时需要提供的端口
+[root@mini3 services]# kubectl expose deploy kubernetes-bootcamp --type="NodePort" --target-port=8080 --port=80
+service "kubernetes-bootcamp" exposed
+[root@mini3 services]# kubectl get services
+NAME                  TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+kubernetes            ClusterIP   10.68.0.1      <none>        443/TCP        15h
+kubernetes-bootcamp   NodePort    10.68.54.205   <none>        80:24083/TCP   25s   // 从80端口映射到24083（对于安装有kube-proxy的节点来说）
+
+# 查看安装有kube-proxy的31,32
+[root@mini2 ~]# netstat -ntlp|grep 24083
+tcp6       0      0 :::24083                :::*                    LISTEN      21004/kube-proxy 
+# 访问服务
+[root@mini3 services]# kubectl get services
+NAME                  TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+kubernetes            ClusterIP   10.68.0.1      <none>        443/TCP        16h
+kubernetes-bootcamp   NodePort    10.68.54.205   <none>        80:24083/TCP   1h     // 在容器之间访问服务使用的CLUSTER-IP
+[root@mini3 services]# curl 192.168.252.32:24083
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-6b7849c495-jkwh5 | v=1
+
+```
+```bash
+# 进入容器内部通过CLUSTER-IP访问服务
+# 查询所有的pods ,所有的pod都是可以访问到cluster IP,并且容器之间互通，这是kubernetes设计上做的一个要求
+[root@mini3 services]# kubectl get pods -o wide
+NAME                                   READY     STATUS    RESTARTS   AGE       IP             NODE
+kubernetes-bootcamp-6b7849c495-jkwh5   1/1       Running   0          14h       172.20.55.67   192.168.252.32
+kubernetes-bootcamp-6b7849c495-qshxt   1/1       Running   0          14h       172.20.51.67   192.168.252.31
+nginx                                  1/1       Running   0          7h        172.20.51.68   192.168.252.31
+nginx-deployment-6c54bd5869-jsqvr      1/1       Running   0          3h        172.20.55.68   192.168.252.32
+nginx-deployment-6c54bd5869-vj88j      1/1       Running   0          3h        172.20.51.69   192.168.252.31
+
+
+[root@mini3 services]# kubectl get services
+NAME                  TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+kubernetes            ClusterIP   10.68.0.1      <none>        443/TCP        16h
+kubernetes-bootcamp   NodePort    10.68.54.205   <none>        80:24083/TCP   1h
+
+## 进入kubernetes-bootcamp-6b7849c495-jkwh5，通过CLUSTER-IP访问服务
+# 查找pod对应的容器
+[root@mini2 ~]# docker ps | grep boot
+44c19d4a1462        jocatalin/kubernetes-bootcamp                                "/bin/sh -c 'node se…"   14 hours ago        Up 14 hours                             k8s_kubernetes-bootcamp_kubernetes-bootcamp-95-jkwh5_default_727da575-1e71-11e9-9327-0050562bce70_0
+65761a4a1f2b        registry.cn-hangzhou.aliyuncs.com/imooc/pause-amd64:3.0      "/pause"                 14 hours ago        Up 14 hours                             k8s_POD_kubernetes-bootcamp-6b7849c495-jkwh5_727da575-1e71-11e9-9327-0050562bce70_0
+# 进入容器通过CLUSTER-IP并访问服务
+[root@mini2 ~]# docker exec -it 44c19d4a1462 bash
+root@kubernetes-bootcamp-6b7849c495-jkwh5:/# curl 10.68.54.205 80
+Hello Kubernetes bootcamp! | Running on: kubernetes-bootcamp-6b7849c495-qshxt | v=1
+curl: (7) Couldn't connect to server
+root@kubernetes-bootcamp-6b7849c495-jkwh5:/# 
+
+```
+
+```bash
+# 演示容器之间相互访问
+# 访问nginx-deployment-6c54bd5869-jsqvr      1/1       Running   0          3h        172.20.55.68   192.168.252.32
+[root@mini2 ~]# docker exec -it 44c19d4a1462 bash
+root@kubernetes-bootcamp-6b7849c495-jkwh5:/# curl 172.20.55.68
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+
+
+```
+
+**指定映射的IP创建服务**
+```bash
+# 编写yaml配置文件
+[root@mini3 services]# vi nginx-service.yaml
+
+apiVersion: v1    
+kind: Service
+metadata:
+  name: nginx-service
+spec:    // 说明书
+  ports:
+  - port: 8080   // Cluster IP对应的端口
+    targetPort: 80  // 容器的端口，具体的nginx服务对应的端口
+    nodePort: 20000   // 节点上监听的端口，能对集群外部提供服务的端口
+  selector:   // 选择给谁提供端口
+    app: nginx
+  type: NodePort   // 类型
+
+# 启动服务，并查询服务列表
+[root@mini3 services]# kubectl create -f nginx-service.yaml
+service "nginx-service" created
+[root@mini3 services]# kubectl get services
+NAME                  TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+kubernetes            ClusterIP   10.68.0.1      <none>        443/TCP          17h
+kubernetes-bootcamp   NodePort    10.68.54.205   <none>        80:24083/TCP     2h
+nginx-service         NodePort    10.68.168.94   <none>        8080:20000/TCP   24s
+#通过20000访问服务
+[root@mini3 ~]#  curl 192.168.252.32:20000
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+
+
+```
+
+
 #### 9.3 重点配置说明
 **kube-proxy.service**
 > [Unit]  
@@ -665,7 +785,7 @@ kube-dns.yaml文件基本与官方一致（除了镜像名不同外）。
 ```bash
 #到kubernetes-starter目录执行命令
 $ kubectl create -f target/services/kube-dns.yaml
-```
+```imooc
 #### 10.3 重点配置说明
 请直接参考配置文件中的注释。
 
