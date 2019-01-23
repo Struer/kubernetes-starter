@@ -526,7 +526,7 @@ Name:                   kubernetes-bootcamp
     Image:        jocatalin/kubernetes-bootcamp:v1
 
 ```
-**配置文件的方式**
+**配置文件的方式，创建pod**
 ```bash
 [root@mini3 ~]# mkdir services
 [root@mini3 ~]# cd services/
@@ -553,8 +553,68 @@ nginx                                  0/1       ContainerCreating   0          
 NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 kubernetes-bootcamp   2         2         2            2           8h
 
+# 开启kube proxy 
+[root@mini3 services]# kubectl proxy
+Starting to serve on 127.0.0.1:8001
+# 在新窗口访问nginx
+[root@mini3 ~]# curl http://localhost:8001/api/v1/proxy/namespaces/default/pods/nginx/
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
 
 ```
+
+**配置文件的方式，创建deployment**
+```bash
+# 编写配置文件
+root@mini3 services]# vi nginx-deployment.yaml
+
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.7.9
+        ports:
+          - containerPort: 80
+
+# 创建deployment
+[root@mini3 services]# kubectl create -f nginx-deployment.yaml 
+deployment "nginx-deployment" created
+
+[root@mini3 services]# kubectl get deploy
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   2         2         2            2           12h
+nginx-deployment      2         2         2            1           15s
+
+[root@mini3 services]# kubectl get pods
+NAME                                   READY     STATUS    RESTARTS   AGE
+kubernetes-bootcamp-6b7849c495-jkwh5   1/1       Running   0          11h
+kubernetes-bootcamp-6b7849c495-qshxt   1/1       Running   0          11h
+nginx                                  1/1       Running   0          4h
+nginx-deployment-6c54bd5869-jsqvr      1/1       Running   0          55s
+nginx-deployment-6c54bd5869-vj88j      1/1       Running   0          55s
+# -l 表示label   app筛选
+[root@mini3 services]# kubectl get pods -l app=nginx
+NAME                                READY     STATUS    RESTARTS   AGE
+nginx-deployment-6c54bd5869-jsqvr   1/1       Running   0          9m
+nginx-deployment-6c54bd5869-vj88j   1/1       Running   0          9m
+
+
+```
+
 
 ## 9. 为集群增加service功能 - kube-proxy（工作节点）
 #### 9.1 简介
