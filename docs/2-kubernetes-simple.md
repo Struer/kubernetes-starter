@@ -526,7 +526,35 @@ Name:                   kubernetes-bootcamp
     Image:        jocatalin/kubernetes-bootcamp:v1
 
 ```
+**配置文件的方式**
+```bash
+[root@mini3 ~]# mkdir services
+[root@mini3 ~]# cd services/
+[root@mini3 services]# vi nginx-pod.yaml
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.7.9
+      ports:
+      - containerPort: 80
+# 查看pods，有ContainerCreating的
+[root@mini3 services]# kubectl get pods
+NAME                                   READY     STATUS              RESTARTS   AGE
+kubernetes-bootcamp-6b7849c495-jkwh5   1/1       Running             0          7h
+kubernetes-bootcamp-6b7849c495-qshxt   1/1       Running             0          7h
+nginx                                  0/1       ContainerCreating   0          19s
+# 查看deploy，无
+[root@mini3 services]# kubectl get deploy
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   2         2         2            2           8h
+
+
+```
 
 ## 9. 为集群增加service功能 - kube-proxy（工作节点）
 #### 9.1 简介
