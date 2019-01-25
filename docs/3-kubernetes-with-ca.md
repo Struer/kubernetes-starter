@@ -69,6 +69,8 @@ $ service etcd stop && rm -fr /var/lib/etcd/*
 $ cd ~/kubernetes-starter
 #按照配置文件的提示编辑好配置
 $ vi config.properties
+ETCD_ENDPOINTS=https://192.168.252.33:2379
+
 #生成配置
 $ ./gen-config.sh with-ca
 ```
@@ -104,7 +106,7 @@ $ ls
 ca-config.json  ca.csr  ca-csr.json  ca-key.pem  ca.pem
 ```
 
-## 4. 改造etcd
+## 4. 改造etcd（主节点）
 
 #### 4.1 准备证书
 etcd节点需要提供给其他服务访问，就要验证其他服务的身份，所以需要一个标识自己监听服务的server证书，当有多个etcd节点的时候也需要client证书与etcd集群其他节点交互，当然也可以client和server使用同一个证书因为它们本质上没有区别。
@@ -124,7 +126,7 @@ $ cfssl gencert \
 $ ls
 etcd.csr  etcd-csr.json  etcd-key.pem  etcd.pem
 ```
-#### 4.2 改造etcd服务
+#### 4.2 改造etcd服务(主节点)
 建议大家先比较一下增加认证的etcd配置与原有配置的区别，做到心中有数。
 可以使用命令比较：
 ```bash
@@ -136,16 +138,17 @@ $ vimdiff kubernetes-simple/master-node/etcd.service kubernetes-with-ca/master-n
 $ cp ~/kubernetes-starter/target/master-node/etcd.service /lib/systemd/system/
 $ systemctl daemon-reload
 $ service etcd start
+$ journalctl -f
 #验证etcd服务（endpoints自行替换）
 $ ETCDCTL_API=3 etcdctl \
-  --endpoints=https://192.168.1.102:2379  \
+  --endpoints=https://192.168.252.33:2379  \
   --cacert=/etc/kubernetes/ca/ca.pem \
   --cert=/etc/kubernetes/ca/etcd/etcd.pem \
   --key=/etc/kubernetes/ca/etcd/etcd-key.pem \
   endpoint health
 ```
 
-## 5. 改造api-server
+## 5. 改造api-server（主节点）
 #### 5.1 准备证书
 ```bash
 #api-server证书放在这，api-server是核心，文件夹叫kubernetes吧，如果想叫apiserver也可以，不过相关的地方都需要修改哦
@@ -274,7 +277,7 @@ etcd-0               Healthy   {"health": "true"}
 ```
 
 
-## 9. 改造calico-node
+## 9. 改造calico-node（所有节点）
 #### 9.1 准备证书
 后续可以看到calico证书用在四个地方：
 * calico/node 这个docker 容器运行时访问 etcd 使用证书
@@ -298,7 +301,7 @@ $ ls
 calico.csr  calico-csr.json  calico-key.pem  calico.pem
 ```
 
-#### 9.2 改造calico服务
+#### 9.2 改造calico服务（所有node）
 **查看diff**
 ```bash
 $ cd ~/kubernetes-starter
@@ -309,6 +312,7 @@ $ vimdiff kubernetes-simple/all-node/kube-calico.service kubernetes-with-ca/all-
 /etc/kubernetes/ca/calico/calico.pem  
 /etc/kubernetes/ca/calico/calico-key.pem  
 由于calico服务是所有节点都需要启动的，大家需要把这几个文件拷贝到每台服务器上
+scp -r /etc/kubernetes/ca/ linux@192.168.252.32:/etc/kubernetes/ca/
 
 **更新calico服务**
 ```bash
@@ -361,7 +365,7 @@ $ kubectl config use-context default --kubeconfig=bootstrap.kubeconfig
 #将刚生成的文件移动到合适的位置
 $ mv bootstrap.kubeconfig /etc/kubernetes/
 ```
-#### 10.3 准备cni配置
+#### 10.3 准备cni配置(工作节点)
 **查看diff**
 ```bash
 $ cd ~/kubernetes-starter
@@ -371,7 +375,7 @@ $ vimdiff kubernetes-simple/worker-node/10-calico.conf kubernetes-with-ca/worker
 ```bash
 $ cp ~/kubernetes-starter/target/worker-node/10-calico.conf /etc/cni/net.d/
 ```
-#### 10.4 改造kubelet服务
+#### 10.4 改造kubelet服务(工作节点)
 **查看diff**
 ```bash
 $ cd ~/kubernetes-starter
@@ -386,6 +390,9 @@ $ service kubelet start
 
 #启动kubelet之后到master节点允许worker加入(批准worker的tls证书请求)
 #--------*在主节点执行*---------
+# 查看请求
+kubectl get csr
+# 同意请求
 $ kubectl get csr|grep 'Pending' | awk '{print $1}'| xargs kubectl certificate approve
 #-----------------------------
 
@@ -393,7 +400,7 @@ $ kubectl get csr|grep 'Pending' | awk '{print $1}'| xargs kubectl certificate a
 $ journalctl -f -u kubelet
 ```
 
-## 11. 改造kube-proxy
+## 11. 改造kube-proxy（工作节点 31 / 32 ）
 #### 11.1 准备证书
 ```bash
 #proxy证书放在这
@@ -415,7 +422,7 @@ $ ls
 kube-proxy.csr  kube-proxy-csr.json  kube-proxy-key.pem  kube-proxy.pem
 ```
 
-#### 11.2 生成kube-proxy.kubeconfig配置
+#### 11.2 生成kube-proxy.kubeconfig配置（工作节点 31 / 32 ）
 ```bash
 #设置集群参数（注意替换ip）
 $ kubectl config set-cluster kubernetes \
@@ -463,7 +470,7 @@ $ service kube-proxy start
 $ journalctl -f -u kube-proxy
 ```
 
-## 12. 改造kube-dns
+## 12. 改造kube-dns（主节点）
 kube-dns有些特别，因为它本身是运行在kubernetes集群中，以kubernetes应用的形式运行。所以它的认证授权方式跟之前的组件都不一样。它需要用到service account认证和RBAC授权。  
 **service account认证：**  
 每个service account都会自动生成自己的secret，用于包含一个ca，token和secret，用于跟api-server认证  
@@ -489,9 +496,31 @@ $ kubectl -n kube-system get pods
 终于，安全版的kubernetes集群我们部署完成了。  
 下面我们使用新集群先温习一下之前学习过的命令，然后再认识一些新的命令，新的参数，新的功能。同样，具体内容请看[视频教程][3]吧~
 
+**查看日志**
+```bash
+[root@mini3 ~]#  kubectl run kubernetes-bootcamp --image=jocatalin/kubernetes-bootcamp:v1 --port=8080
+deployment "kubernetes-bootcamp" created
+[root@mini3 ~]# kubectl get pods
+NAME                                   READY     STATUS    RESTARTS   AGE
+kubernetes-bootcamp-6b7849c495-7zfth   1/1       Running   0          14s
+# 查看日志
+[root@mini3 ~]# kubectl logs kubernetes-bootcamp-6b7849c495-7zfth
+Kubernetes Bootcamp App Started At: 2019-01-25T05:34:37.301Z | Running On:  kubernetes-bootcamp-6b7849c495-7zfth 
+# 查看日志，实时刷新
+[root@mini3 ~]# kubectl logs kubernetes-bootcamp-6b7849c495-7zfth -f
+Kubernetes Bootcamp App Started At: 2019-01-25T05:34:37.301Z | Running On:  kubernetes-bootcamp-6b7849c495-7zfth 
+```
 
+**kubectl apply(相当于create )**
+```bash
+[root@mini3 services]# kubectl apply -f nginx-pod.yaml 
+pod "nginx" created
+[root@mini3 services]# kubectl get pods
+NAME                                   READY     STATUS    RESTARTS   AGE
+kubernetes-bootcamp-6b7849c495-7zfth   1/1       Running   0          41m
+nginx                                  1/1       Running   0          13s
 
-
+```
 
 
 [1]: https://www.zhihu.com/question/33645891/answer/57721969

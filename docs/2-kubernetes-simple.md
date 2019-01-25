@@ -775,7 +775,7 @@ ExecStart=/home/michael/bin/kube-proxy \\
 刚才我们在基础集群上演示了pod，deployments。下面就在刚才的基础上增加点service元素。具体内容见[《Docker+k8s微服务容器化实践》][1]。
 
 
-## 10. 为集群增加dns功能 - kube-dns（app）
+## 10. 为集群增加dns功能 - kube-dns（主节点）
 #### 10.1 简介
 kube-dns为Kubernetes集群提供命名服务，主要用来解析集群服务名和Pod的hostname。目的是让pod可以通过名字访问到集群内服务。它通过添加A记录的方式实现名字和service的解析。普通的service会解析到service-ip。headless service会解析到pod列表。
 #### 10.2 部署
