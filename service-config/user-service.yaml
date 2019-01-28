@@ -33,11 +33,11 @@ spec:
     spec:
       containers:
       - name: user-service
-        image: {{HUB}}/micro-service/user-service:latest
+        image: 192.168.252.31/micro-service/user-service:latest
         ports:
         - containerPort: 7911
       - name: user-edge-service
-        image: {{HUB}}/micro-service/user-edge-service:latest
+        image: 192.168.252.31/micro-service/user-edge-service:latest
         ports:
         - containerPort: 8082
 

@@ -26,11 +26,11 @@ spec:
     spec:
       containers:
       - name: course-service
-        image: {{HUB}}/micro-service/course-service:latest
+        image: 192.168.252.31/micro-service/course-service:latest
         ports:
         - containerPort: 20880
       - name: course-edge-service
-        image: {{HUB}}/micro-service/course-edge-service:latest
+        image: 192.168.252.31/micro-service/course-edge-service:latest
         ports:
         - containerPort: 8081
 

@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
       - name: api-gateway
-        image: {{HUB}}/micro-service/api-gateway-zuul:latest
+        image: 192.168.252.31/micro-service/api-gateway-zuul:latest
         ports:
         - containerPort: 8080
 
