@@ -12,6 +12,7 @@ spec:
     nodePort: 80
   selector:
     app: api-gateway
+  #需要对外提供服务
   type: NodePort
 ---
 apiVersion: apps/v1beta1
