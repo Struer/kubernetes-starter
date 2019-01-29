@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: message-service
-        image: 192.168.252.31/micro-service/message-service:latest
+        image: hub.mydocker.com/micro-service/message-service:latest
         ports:
         - containerPort: 9090
 
