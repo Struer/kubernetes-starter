@@ -6,19 +6,19 @@ $ docker pull registry.cn-hangzhou.aliyuncs.com/imooc/gitlab-ce:latest
 ```
 
 ## 二、运行GitLab容器
-使用docker命令运行容器，注意修改hostname为自己喜欢的名字，-v部分挂载目录要修改为自己的目录。  
+使用docker命令运行容器，注意修改hostname为自己喜欢的名字，-v(GITLAB_DIR)部分挂载目录要修改为自己的目录。  
 端口映射这里使用的都是安全端口，如果大家的环境没有端口限制或冲突可以使用与容器同端口，如：-p 443:443 -p 80:80 -p 22:22
 #### 1. 生成启动文件 - start.sh
 ```bash
 $ cat <<EOF > start.sh
 #!/bin/bash
-HOST_NAME=gitlab.mooc.com
-GITLAB_DIR=`pwd`
+HOST_NAME=192.168.252.31
+GITLAB_DIR=/home/linux/gitlab
 docker stop gitlab
 docker rm gitlab
 docker run -d \\
     --hostname \${HOST_NAME} \\
-    -p 8443:443 -p 8080:80 -p 2222:22 \\
+    -p 9443:443 -p 9080:80 -p 2222:22 \\
     --name gitlab \\
     -v \${GITLAB_DIR}/config:/etc/gitlab \\
     -v \${GITLAB_DIR}/logs:/var/log/gitlab \\
@@ -29,17 +29,21 @@ EOF
 #### 2. 运行start.sh 启动gitlab
 ```bash
 $ sh start.sh
+
+#查看启动日志
+$ doker logs -f gitlab
+
 ```
 
 #### 3. 配置环境
-* 修改host文件，使域名可以正常解析
+* 修改host文件，使域名可以正常解析（宿主机上）
 > 127.0.0.1 gitlab.mooc.com
 
-* 修改ssh端口（如果主机端口使用的不是22端口）
+* 修改ssh端口（如果主机的ssh端口使用的不是22端口就无需修改，这里主机ssh是22端口，避免冲突，将gitlab的ssh端口修改为2222）
 > 修改文件：${GITLAB_DIR}/config/gitlab.rb
 > 找到这一行：# gitlab_rails['gitlab_shell_ssh_port'] = 22
 > 把22修改为你的宿主机端口（这里是2222）。然后将注释去掉。
-
+> 修改之后项目的ssh访问地址：ssh://git@www.mygitlab.com:2222/zhujialei/microservice.git
 * 重新启动容器
 ```bash
 $ sh start.sh
@@ -49,7 +53,7 @@ $ sh start.sh
 #### 1. 打开首页
 地址：http://gitlab.mooc.com:8080/  
 
-#### 2. 设置管理员密码
+#### 2. 设置管理员密码(设置为111111111)
 首先根据提示输入管理员密码，这个密码是管理员用户的密码。对应的用户名是root，用于以管理员身份登录Gitlab。  
 <img src="images/rootpass.png" width="50%" height="50%"/>
 
