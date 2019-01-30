@@ -1,0 +1,52 @@
+#!groovy
+pipeline {
+    agent any
+
+    environment {
+        REPOSITORY="ssh://git@www.mygitlab.com:2222/zhujialei/microservice.git" //仓库地址
+        DEPLOYMENT="user-service-deployment" //用于构建deployment的xxx.yaml文件中deployment的名字
+        MODULE="user-edge-service"  // 模块
+        SCRIPT_PATH="/root/scripts"  // 脚本存放目录
+    }
+
+    stages {
+
+        stage('获取代码') {
+            steps {
+                echo "start fetch code from git:${REPOSITORY}"
+                deleteDir()   // 删除目录
+                git "${REPOSITORY}"  // 拉取代码
+            }
+        }
+        // 可以使用findbugs或者sonar结合maven或单独使用，这里不做配置
+        stage('代码静态检查') {
+            steps {
+                echo "start code check"
+            }
+        }
+
+        stage('编译+单元测试') {
+            steps {
+                echo "start compile"
+                // -U 编译 -pl 指定模块 -am自动构建该模块所依赖的其他模块
+                sh "mvn -U -pl ${MODULE} -am clean package"
+            }
+        }
+        // 构建镜像的步骤写在脚本中，然后执行脚本
+        stage('构建镜像') {
+            steps {
+                echo "start build image"
+                // 脚本只需要能够实现镜像的构建就可以了
+                sh "${SCRIPT_PATH}/build-images.sh ${MODULE}"
+            }
+        }
+        // 发布系统
+        stage('发布系统') {
+            steps {
+                echo "start deploy"
+                // 执行发布脚本
+                sh "${SCRIPT_PATH}/deploy.sh ${DEPLOYMENT} ${MODULE}"
+            }
+        }
+    }
+}
