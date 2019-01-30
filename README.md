@@ -6,6 +6,7 @@
 ## [二、基础集群部署 - kubernetes-simple][2]
 ## [三、完整集群部署 - kubernetes-with-ca][3]
 ## [四、在kubernetes上部署我们的微服务][4]
+## [五、kubectl部署服务][5]
 
 
 
@@ -18,4 +19,6 @@
   [2]: https://github.com/Struer/kubernetes-starter/tree/master/docs/2-kubernetes-simple.md
   [3]: https://github.com/Struer/kubernetes-starter/tree/master/docs/3-kubernetes-with-ca.md
   [4]: https://github.com/Struer/kubernetes-starter/tree/master/docs/4-microservice-deploy.md
-  [5]: https://coding.imooc.com/class/198.html
+  [5]: https://github.com/Struer/kubernetes-starter/tree/master/docs/5-kubectl部署服务.md
+  [6]: https://github.com/Struer/kubernetes-starter/tree/master/docs/6-CICD实践.md
+  [7]: https://coding.imooc.com/class/198.html

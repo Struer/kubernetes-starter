@@ -1,4 +1,4 @@
-# Jenkins安装、使用教程（Docker版）建议安装在不是kubectk的机器（33）
+# Jenkins安装、使用教程（Docker版）建议安装在部署kubectl的机器（33）
 部署jenkins的机器需要有java1.8环境和maven的环境
 
 Download and run Jenkins

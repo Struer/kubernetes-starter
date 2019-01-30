@@ -9,11 +9,15 @@
 - API网关：api-gateway
 
 ##### 把它们放到kubernetes集群运行我们要考虑什么问题？
+在kubernetes中最小的单元时pod，一个pod可以包含一个或多个容器  
 - 哪些服务适合单独成为一个pod？哪些服务适合在一个pod中？
+ message-service   course-dubbo-service和course-edge-service   user-thrift-service和user-edge-service  api-gateway  
 - 在一个pod里面的服务如何彼此访问？他们的服务如何对外提供服务？
+答1：因为实在同一台机器，可以通过localhost访问。答2：集群内访问可以通过clusterIP，在kubedns中解析获得ip访问。
 - 单独的pod如何对外提供服务？
+clusterIP，在kubedns中解析获得ip访问
 - 哪个服务作为整个服务的入口，入口服务如何对外提供服务？
-
+使用nodePort
 
 ## 2. 搞定配置
 配置的模板已经为大家准备好了，但是还需要大家做一下处理才能使用哦，参考下面脚本：
